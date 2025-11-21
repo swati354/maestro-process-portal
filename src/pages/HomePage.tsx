@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ProcessList } from '@/components/maestro/ProcessList';
 import { InstanceList } from '@/components/maestro/InstanceList';
 import { InstanceDetail } from '@/components/maestro/InstanceDetail';
-import { useUiPathMaestroProcesses, useUiPathMaestroInstances, useUiPathMaestroVariables } from '@/hooks/useUiPathMaestro';
+import { useUiPathMaestroProcesses, useUiPathMaestroInstances } from '@/hooks/useUiPathMaestro';
 import { AlertCircle, Workflow, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -10,45 +10,35 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Toaster } from '@/components/ui/sonner';
 import type { RawMaestroProcessGetAllResponse, RawProcessInstanceGetResponse } from 'uipath-sdk';
-
 type ViewState =
     | { level: 'processes' }
     | { level: 'instances'; process: RawMaestroProcessGetAllResponse }
     | { level: 'detail'; process: RawMaestroProcessGetAllResponse; instance: RawProcessInstanceGetResponse };
-
 export function HomePage() {
     const [viewState, setViewState] = useState<ViewState>({ level: 'processes' });
-
     const { data: processes, isLoading: loadingProcesses, error: processError, refetch: refetchProcesses } = useUiPathMaestroProcesses();
     const { data: allInstances, isLoading: loadingInstances, error: instanceError, refetch: refetchInstances } = useUiPathMaestroInstances();
-
     const handleProcessSelect = (process: RawMaestroProcessGetAllResponse) => {
         setViewState({ level: 'instances', process });
     };
-
     const handleInstanceSelect = (instance: RawProcessInstanceGetResponse) => {
         if (viewState.level === 'instances') {
             setViewState({ level: 'detail', process: viewState.process, instance });
         }
     };
-
     const handleBackToProcesses = () => {
         setViewState({ level: 'processes' });
     };
-
     const handleBackToInstances = () => {
         if (viewState.level === 'detail') {
             setViewState({ level: 'instances', process: viewState.process });
         }
     };
-
     // Filter instances for selected process
     const processInstances = viewState.level !== 'processes' && allInstances
         ? allInstances.filter(inst => inst.processKey === viewState.process.processKey)
         : [];
-
     const error = processError || instanceError;
-
     return (
         <AppLayout>
             <div className="min-h-screen bg-background">
@@ -85,7 +75,6 @@ export function HomePage() {
                             </div>
                         </div>
                     </header>
-
                     {/* Error Alert */}
                     {error && (
                         <Alert variant="destructive">
@@ -96,7 +85,6 @@ export function HomePage() {
                             </AlertDescription>
                         </Alert>
                     )}
-
                     {/* Content */}
                     {viewState.level === 'processes' && (
                         <ProcessList
@@ -106,7 +94,6 @@ export function HomePage() {
                             onRefresh={refetchProcesses}
                         />
                     )}
-
                     {viewState.level === 'instances' && (
                         <InstanceList
                             instances={processInstances}
@@ -115,12 +102,11 @@ export function HomePage() {
                             onRefresh={refetchInstances}
                         />
                     )}
-
                     {viewState.level === 'detail' && (
                         <InstanceDetail
                             instance={viewState.instance}
                             processKey={viewState.process.processKey}
-                            folderKey={'8645d674-92d8-4281-9aef-43f3e3608ded' || viewState.process.folderKey}
+                            folderKey={viewState.process.folderKey || '8645d674-92d8-4281-9aef-43f3e3608ded'}
                         />
                     )}
                 </div>

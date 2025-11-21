@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
     Play,
     Pause,
@@ -13,7 +16,9 @@ import {
     Clock,
     GitBranch,
     Activity,
-    FileText
+    FileText,
+    Database,
+    Search
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -27,13 +32,11 @@ import {
 } from '@/hooks/useUiPathMaestro';
 import { BpmnDiagramViewer } from '@/components/maestro/BpmnViewer';
 import type { RawProcessInstanceGetResponse } from 'uipath-sdk';
-
 interface InstanceDetailProps {
     instance: RawProcessInstanceGetResponse;
     processKey: string;
     folderKey: string;
 }
-
 function getStatusColor(status: string): string {
     const statusLower = status.toLowerCase();
     if (statusLower.includes('complete') || statusLower.includes('success')) return 'bg-green-500';
@@ -43,35 +46,50 @@ function getStatusColor(status: string): string {
     if (statusLower.includes('cancel')) return 'bg-gray-500';
     return 'bg-gray-400';
 }
-
+function formatVariableValue(value: any): string {
+    if (value === null || value === undefined) {
+        return 'null';
+    }
+    if (typeof value === 'string') {
+        return value.length > 100 ? `${value.substring(0, 100)}...` : value;
+    }
+    if (typeof value === 'object') {
+        try {
+            const jsonStr = JSON.stringify(value, null, 2);
+            return jsonStr.length > 100 ? `${jsonStr.substring(0, 100)}...` : jsonStr;
+        } catch {
+            return '[Complex Object]';
+        }
+    }
+    return String(value);
+}
 export function InstanceDetail({ instance, processKey, folderKey }: InstanceDetailProps) {
+    const [variableSearchTerm, setVariableSearchTerm] = useState('');
     const { mutate: pauseInstance, isPending: isPausing } = usePauseMaestroInstance();
     const { mutate: resumeInstance, isPending: isResuming } = useResumeMaestroInstance();
     const { mutate: cancelInstance, isPending: isCanceling } = useCancelMaestroInstance();
-
     // Fetch live instance data by ID for real-time updates
     const { data: liveInstance, isLoading: isInstanceLoading } = useUiPathMaestroInstanceById(
         instance.instanceId,
         folderKey
     );
-
     const { data: bpmnDiagram, isLoading: isBpmnLoading, error: bpmnError } = useUiPathMaestroBpmnDiagram(
         instance.instanceId,
         folderKey
     );
-
     const { data: executionHistory, isLoading: isHistoryLoading, error: historyError } = useUiPathMaestroExecutionHistory(
         instance.instanceId
     );
-
+    const { data: variablesData, isLoading: isVariablesLoading, error: variablesError } = useUiPathMaestroVariables(
+        instance.instanceId,
+        folderKey
+    );
     // Use live instance data if available, otherwise fall back to prop
     const currentInstance = liveInstance || instance;
-
     const canPause = currentInstance.latestRunStatus.toLowerCase().includes('running');
     const canResume = currentInstance.latestRunStatus.toLowerCase().includes('pause');
     const canCancel = !currentInstance.latestRunStatus.toLowerCase().includes('complete')
         && !currentInstance.latestRunStatus.toLowerCase().includes('cancel');
-
     const handlePause = () => {
         pauseInstance({
             instanceId: currentInstance.instanceId,
@@ -79,7 +97,6 @@ export function InstanceDetail({ instance, processKey, folderKey }: InstanceDeta
             comment: 'Paused from Maestro Portal'
         });
     };
-
     const handleResume = () => {
         resumeInstance({
             instanceId: currentInstance.instanceId,
@@ -87,7 +104,6 @@ export function InstanceDetail({ instance, processKey, folderKey }: InstanceDeta
             comment: 'Resumed from Maestro Portal'
         });
     };
-
     const handleCancel = () => {
         if (confirm('Are you sure you want to cancel this instance?')) {
             cancelInstance({
@@ -97,7 +113,12 @@ export function InstanceDetail({ instance, processKey, folderKey }: InstanceDeta
             });
         }
     };
-
+    // Filter variables based on search term
+    const filteredVariables = variablesData?.globalVariables?.filter(variable =>
+        variable.name?.toLowerCase().includes(variableSearchTerm.toLowerCase()) ||
+        variable.type?.toLowerCase().includes(variableSearchTerm.toLowerCase()) ||
+        variable.source?.toLowerCase().includes(variableSearchTerm.toLowerCase())
+    ) || [];
     return (
         <div className="space-y-6">
             {/* Action Bar */}
@@ -146,15 +167,14 @@ export function InstanceDetail({ instance, processKey, folderKey }: InstanceDeta
                     </div>
                 </CardContent>
             </Card>
-
             {/* Detailed Information */}
             <Tabs defaultValue="overview" className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="bpmn">BPMN Diagram</TabsTrigger>
                     <TabsTrigger value="execution">Execution History</TabsTrigger>
+                    <TabsTrigger value="variables">Variables</TabsTrigger>
                 </TabsList>
-
                 <TabsContent value="overview" className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Card>
@@ -186,7 +206,6 @@ export function InstanceDetail({ instance, processKey, folderKey }: InstanceDeta
                                 </div>
                             </CardContent>
                         </Card>
-
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-base flex items-center gap-2">
@@ -216,7 +235,6 @@ export function InstanceDetail({ instance, processKey, folderKey }: InstanceDeta
                                 </div>
                             </CardContent>
                         </Card>
-
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-base flex items-center gap-2">
@@ -248,7 +266,6 @@ export function InstanceDetail({ instance, processKey, folderKey }: InstanceDeta
                                 )}
                             </CardContent>
                         </Card>
-
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-base flex items-center gap-2">
@@ -272,7 +289,6 @@ export function InstanceDetail({ instance, processKey, folderKey }: InstanceDeta
                         </Card>
                     </div>
                 </TabsContent>
-
                 <TabsContent value="bpmn" className="space-y-4">
                     <Card>
                         <CardHeader>
@@ -332,7 +348,6 @@ export function InstanceDetail({ instance, processKey, folderKey }: InstanceDeta
                         </CardContent>
                     </Card>
                 </TabsContent>
-
                 <TabsContent value="execution" className="space-y-4">
                     <Card>
                         <CardHeader>
@@ -365,7 +380,6 @@ export function InstanceDetail({ instance, processKey, folderKey }: InstanceDeta
                                     </div>
                                 </div>
                             ) : null}
-
                             {currentInstance.instanceRuns && currentInstance.instanceRuns.length > 0 ? (
                                 <div className="space-y-3 mt-4">
                                     <p className="text-sm font-medium">Instance Runs ({currentInstance.instanceRuns.length})</p>
@@ -413,6 +427,121 @@ export function InstanceDetail({ instance, processKey, folderKey }: InstanceDeta
                             ) : (
                                 <div className="text-center py-8 text-muted-foreground">
                                     No execution history available
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="variables" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Database className="h-5 w-5" />
+                                Global Variables
+                            </CardTitle>
+                            <CardDescription>
+                                Process instance variables and their current values ({variablesData?.globalVariables?.length || 0} total)
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {isVariablesLoading ? (
+                                <div className="flex items-center justify-center p-8">
+                                    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                                    <span className="ml-3 text-muted-foreground">Loading variables...</span>
+                                </div>
+                            ) : variablesError ? (
+                                <div className="border-2 border-dashed border-destructive/30 rounded-lg p-12 text-center">
+                                    <XCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
+                                    <p className="text-lg font-semibold mb-2 text-destructive">Failed to load variables</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {variablesError.message || 'Could not fetch variable data'}
+                                    </p>
+                                </div>
+                            ) : variablesData?.globalVariables && variablesData.globalVariables.length > 0 ? (
+                                <div className="space-y-4">
+                                    {/* Search Input */}
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Search variables by name, type, or source..."
+                                            value={variableSearchTerm}
+                                            onChange={(e) => setVariableSearchTerm(e.target.value)}
+                                            className="pl-10"
+                                        />
+                                    </div>
+                                    {/* Variables Table */}
+                                    {filteredVariables.length > 0 ? (
+                                        <div className="border rounded-lg overflow-hidden">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead className="font-semibold">Name</TableHead>
+                                                        <TableHead className="font-semibold">Type</TableHead>
+                                                        <TableHead className="font-semibold">Value</TableHead>
+                                                        <TableHead className="font-semibold">Element ID</TableHead>
+                                                        <TableHead className="font-semibold">Source</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {filteredVariables.map((variable, index) => (
+                                                        <TableRow key={variable.id || index} className="hover:bg-muted/50">
+                                                            <TableCell className="font-medium">
+                                                                {variable.name || 'N/A'}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Badge variant="outline" className="text-xs">
+                                                                    {variable.type || 'Unknown'}
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell className="max-w-xs">
+                                                                <div className="font-mono text-xs bg-muted/30 p-2 rounded border">
+                                                                    {formatVariableValue(variable.value)}
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell className="font-mono text-xs text-muted-foreground">
+                                                                {variable.elementId || 'N/A'}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Badge variant="secondary" className="text-xs">
+                                                                    {variable.source || 'Unknown'}
+                                                                </Badge>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-8 text-muted-foreground">
+                                            <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                            <p className="text-lg font-semibold mb-2">No variables match your search</p>
+                                            <p className="text-sm">
+                                                Try adjusting your search terms or clear the search to see all variables.
+                                            </p>
+                                        </div>
+                                    )}
+                                    {/* Variables Summary */}
+                                    {variablesData.globalVariables.length > 0 && (
+                                        <div className="text-xs text-muted-foreground p-3 bg-muted/30 rounded-lg">
+                                            <p>
+                                                Showing {filteredVariables.length} of {variablesData.globalVariables.length} variables
+                                                {variableSearchTerm && ` matching "${variableSearchTerm}"`}
+                                            </p>
+                                            {variablesData.elements && variablesData.elements.length > 0 && (
+                                                <p className="mt-1">
+                                                    Associated with {variablesData.elements.length} BPMN elements
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="border-2 border-dashed border-muted rounded-lg p-12 text-center">
+                                    <Database className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                                    <p className="text-lg font-semibold mb-2">No Variables Available</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        This process instance does not have any global variables defined.
+                                    </p>
                                 </div>
                             )}
                         </CardContent>
