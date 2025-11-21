@@ -8,10 +8,12 @@
  * - Fetch execution history
  * - Control instances (pause, resume, cancel)
  */
+
 import { useQuery, useMutation, useQueryClient, UseQueryResult, UseMutationResult } from '@tanstack/react-query';
 import { uipath } from '../lib/uipath';
 import { toast } from 'sonner';
 import type { RawMaestroProcessGetAllResponse, RawProcessInstanceGetResponse, ProcessInstanceOperationResponse, ProcessInstanceExecutionHistoryResponse, ProcessInstanceGetVariablesResponse, ProcessInstanceGetVariablesOptions } from 'uipath-sdk';
+
 /**
  * Fetch all Maestro processes
  */
@@ -33,6 +35,7 @@ export function useUiPathMaestroProcesses(): UseQueryResult<RawMaestroProcessGet
 		refetchInterval: 30000,
 	});
 }
+
 /**
  * Fetch all Maestro process instances
  */
@@ -54,11 +57,13 @@ export function useUiPathMaestroInstances(): UseQueryResult<RawProcessInstanceGe
 		refetchInterval: 10000, // More frequent for active monitoring
 	});
 }
+
 /**
  * Mutation to pause a Maestro process instance
  */
 export function usePauseMaestroInstance(): UseMutationResult<ProcessInstanceOperationResponse, Error, { instanceId: string; folderKey: string; comment?: string }> {
 	const queryClient = useQueryClient();
+
 	return useMutation({
 		mutationFn: async ({
 			instanceId,
@@ -85,11 +90,13 @@ export function usePauseMaestroInstance(): UseMutationResult<ProcessInstanceOper
 		},
 	});
 }
+
 /**
  * Mutation to resume a Maestro process instance
  */
 export function useResumeMaestroInstance(): UseMutationResult<ProcessInstanceOperationResponse, Error, { instanceId: string; folderKey: string; comment?: string }> {
 	const queryClient = useQueryClient();
+
 	return useMutation({
 		mutationFn: async ({
 			instanceId,
@@ -116,11 +123,13 @@ export function useResumeMaestroInstance(): UseMutationResult<ProcessInstanceOpe
 		},
 	});
 }
+
 /**
  * Mutation to cancel a Maestro process instance
  */
 export function useCancelMaestroInstance(): UseMutationResult<ProcessInstanceOperationResponse, Error, { instanceId: string; folderKey: string; comment?: string }> {
 	const queryClient = useQueryClient();
+
 	return useMutation({
 		mutationFn: async ({
 			instanceId,
@@ -147,6 +156,7 @@ export function useCancelMaestroInstance(): UseMutationResult<ProcessInstanceOpe
 		},
 	});
 }
+
 /**
  * Fetch a single Maestro process instance by ID
  *
@@ -165,9 +175,10 @@ export function useUiPathMaestroInstanceById(
 			if (!instanceId || !folderKey) {
 				throw new Error('Instance ID and folder key are required');
 			}
+
 			try {
 				const result = await uipath.maestro.processes.instances.getById(instanceId, folderKey);
-				return result;
+				return result.data;
 			} catch (error) {
 				console.error(`Failed to fetch Maestro instance ${instanceId}:`, error);
 				throw error;
@@ -177,6 +188,7 @@ export function useUiPathMaestroInstanceById(
 		refetchInterval: 5000, // Frequent for real-time instance monitoring
 	});
 }
+
 /**
  * Fetch BPMN diagram for a Maestro process instance
  *
@@ -198,6 +210,7 @@ export function useUiPathMaestroBpmnDiagram(
 			if (!instanceId || !folderKey) {
 				throw new Error('Instance ID and folder key are required');
 			}
+
 			try {
 				const result = await uipath.maestro.processes.instances.getBpmn(instanceId, folderKey);
 				return result;
@@ -211,6 +224,7 @@ export function useUiPathMaestroBpmnDiagram(
 		refetchInterval: 10000, // Moderate refresh to update execution status in diagram
 	});
 }
+
 /**
  * Fetch execution history for a Maestro process instance
  *
@@ -230,6 +244,7 @@ export function useUiPathMaestroExecutionHistory(
 			if (!instanceId) {
 				throw new Error('Instance ID is required');
 			}
+
 			try {
 				const result = await uipath.maestro.processes.instances.getExecutionHistory(instanceId);
 				return result;
@@ -242,6 +257,7 @@ export function useUiPathMaestroExecutionHistory(
 		refetchInterval: 5000, // Frequent updates for real-time execution tracking
 	});
 }
+
 /**
  * Fetch global variables for a Maestro process instance
  *
@@ -270,13 +286,16 @@ export function useUiPathMaestroVariables(
 			if (!instanceId || !folderKey) {
 				throw new Error('Instance ID and folder key are required');
 			}
+
 			try {
 				const result: ProcessInstanceGetVariablesResponse = await uipath.maestro.processes.instances.getVariables(
 					instanceId,
 					folderKey,
 					variableOptions
 				);
+				
 				return result;
+
 			} catch (error) {
 				console.error(`Failed to fetch variables for instance ${instanceId}:`, error);
 				throw error;
@@ -286,3 +305,4 @@ export function useUiPathMaestroVariables(
 		refetchInterval: 10000, // Moderate refresh for variable monitoring
 	});
 }
+
