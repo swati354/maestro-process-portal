@@ -78,7 +78,8 @@ function updateWranglerJsonc() {
 
 function runSetupCommands() {
     const commands = [
-    "bun add bpmn-js"
+    "bun add bpmn-js",
+    "bun add bpmn-js@^17.0.0"
 ];
     
     if (commands.length === 0) {
